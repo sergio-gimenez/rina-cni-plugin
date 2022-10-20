@@ -1,6 +1,6 @@
 #!/bin/bash
 log=/var/log/cni.log
-config=$(cat /dev/stdin)
+config=`cat /dev/stdin`
 
 echo >> $log
 echo "COMMAND: $CNI_COMMAND" >> $log
@@ -11,14 +11,14 @@ case $CNI_COMMAND in
         podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # 10.240.0.1
         
         # TODO Can I just... Ignore this? VALE it's already created. Not so sure it VALE must need an IP.
-        # brctl addbr cni0 # Crate a new bridge cni0.
-        # ip link set cni0 up
-        # ip addr add "${podcidr_gw}/24" dev cni0 # assign 10.240.0.1/24 to cni0
+        brctl addbr cni0 # Crate a new bridge cni0.
+        ip link set cni0 up
+        ip addr add "${podcidr_gw}/24" dev cni0 # assign 10.240.0.1/24 to cni0
         
         # calculate $ip
         # This method is very simple. Just reads the file that holds the last IP and increment this read IP by one and update the file.
         if [ -f /tmp/last_allocated_ip ]; then
-            n=$(cat /tmp/last_allocated_ip)
+            n=`cat /tmp/last_allocated_ip`
         else
             n=1
         fi
