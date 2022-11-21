@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: alpine1
+  labels:
+    slice_id: "123456"
 spec:
   containers:
     - name: alpine
@@ -17,6 +19,8 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: nginx1
+  labels:
+    slice_id: "123456"
 spec:
   containers:
     - name: nginx
@@ -28,6 +32,8 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: nginx2
+  labels:
+    slice_id: "123456"
 spec:
   containers:
     - name: nginx
