@@ -11,7 +11,7 @@ case $CNI_COMMAND in
     ADD)
 
         # TODO check if the application has a slice_id field, if not, move to DELETE.
-        echo "CNI_CONTAINER_ID = $CNI_CONTAINER_ID" >> $log
+        echo "CNI_CONTAINERID = $CNI_CONTAINERID" >> $log
         podcidr=$(echo $config | jq -r ".podcidr") # 10.240.0.0./24
         podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # 10.240.0.1
         
