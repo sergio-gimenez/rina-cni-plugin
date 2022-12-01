@@ -12,8 +12,6 @@ spec:
         - "/bin/ash"
         - "-c"
         - "sleep 2000"
-  nodeSelector:
-    kubernetes.io/hostname: master
 ---
 apiVersion: v1
 kind: Pod
@@ -25,8 +23,6 @@ spec:
   containers:
     - name: nginx
       image: nginx
-  nodeSelector:
-    kubernetes.io/hostname: master
 ---
 apiVersion: v1
 kind: Pod
@@ -38,7 +34,5 @@ spec:
   containers:
     - name: nginx
       image: nginx
-  nodeSelector:
-    kubernetes.io/hostname: worker
 ---
 
