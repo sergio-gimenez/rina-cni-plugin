@@ -21,6 +21,12 @@ get_pod_name_from(){
 
 case $CNI_COMMAND in
     ADD)
+        echo "CNI_ARGS: $CNI_ARGS" >> $log
+        echo "CNI_NETNS: $CNI_NETNS" >> $log
+        echo "CNI_IFNAME: $CNI_IFNAME" >> $log
+        echo "CNI_PATH: $CNI_PATH" >> $log
+        echo "CNI_CONTAINERID: $CNI_CONTAINERID" >> $log
+        
         
         # TODO check if the application has a slice_id field, if not, move to DELETE.
         
