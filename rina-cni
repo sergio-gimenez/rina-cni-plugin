@@ -5,8 +5,6 @@ config=`cat /dev/stdin`
 echo >> $log
 echo "COMMAND: $CNI_COMMAND" >> $log
 
-CNI_IFNAME=rina0
-
 get_slice_id_from(){
     IN="$1"
     
