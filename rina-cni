@@ -92,7 +92,7 @@ case $CNI_COMMAND in
         pod_name=$(get_pod_name_from "$CNI_ARGS")
         kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id)
         slice_id=$(get_slice_id_from "$kubectl_output")
-        
+
         echo "pod_name=$(get_pod_name_from "$CNI_ARGS")" >> $log
         echo "kubectl_output=$kubectl_output" >> $log
         echo "slice_id: $slice_id" >> $log
