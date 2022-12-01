@@ -83,6 +83,9 @@ case $CNI_COMMAND in
         echo "$output"
         
         # Get slic3_id of current pod
+        exec 19>$log
+        BASH_XTRACEFD=19
+        set -x
         pod_name=$(get_pod_name_from "$CNI_ARGS")
         kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id)
         slice_id=$(get_slice_id_from "$kubectl_output")
