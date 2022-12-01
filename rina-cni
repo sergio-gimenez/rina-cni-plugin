@@ -88,12 +88,13 @@ case $CNI_COMMAND in
         echo $output >> $log
         echo "$output"
         
-        echo "pod_name=$(get_pod_name_from "$CNI_ARGS")" >> $log
+        
         pod_name=$(get_pod_name_from "$CNI_ARGS")
-        echo "kubectl_output=$(kubectl get pods $pod_name -o json)" >> $log
         kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id)
-        echo "kubectl_output=$kubectl_output" >> $log
         slice_id=$(get_slice_id_from "$kubectl_output")
+        
+        echo "pod_name=$(get_pod_name_from "$CNI_ARGS")" >> $log
+        echo "kubectl_output=$kubectl_output" >> $log
         echo "slice_id: $slice_id" >> $log
     ;;
     
