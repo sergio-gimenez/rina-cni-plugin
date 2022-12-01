@@ -54,7 +54,7 @@ case $CNI_COMMAND in
         ip netns exec $CNI_CONTAINERID ip addr add $ip/24 dev $CNI_IFNAME
         ip netns exec $CNI_CONTAINERID ip route add default via $podcidr_gw # TODO I think this is not needed
         
-        mac=$(ip netns exec $CNI_CONTAINERID ip link show eth0 | awk '/ether/ {print $2}')
+        mac=$(ip netns exec "$CNI_CONTAINERID" ip link show eth0 | awk '/ether/ {print $2}')
         address="${ip}/24"
         output_template='
         {
@@ -75,8 +75,12 @@ case $CNI_COMMAND in
                 }
             ]
         }'
-        
-        output=$(printf "${output_template}" $CNI_IFNAME $mac $CNI_NETNS $address $podcidr_gw)
+        echo "CNI_IFNAME $CNI_IFNAME" >> $log
+        echo "mac $mac" >> $log
+        echo "CNI_NETNS (sandbox) $CNI_NETNS" >> $log
+        echo "address $address" >> $log
+        echo "podcidr_gw $podcidr_gw" >> $log
+        output=$(printf "${output_template}" "$CNI_IFNAME" "$mac" "$CNI_NETNS" "$address" "$podcidr_gw")
         echo $output >> $log
         echo "$output"
         
@@ -90,6 +94,7 @@ case $CNI_COMMAND in
     DEL)
         rm -rf /var/run/netns/$CNI_CONTAINERID
         vale-ctl -d vale0:$host_ifname
+        echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
     ;;
     
     GET)
