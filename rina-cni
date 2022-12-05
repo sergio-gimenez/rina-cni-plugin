@@ -29,9 +29,9 @@ get_pod_namespace_from(){
 should_ignore_pod(){
 	cni_args="$1"
 	if grep -q "IgnoreUnknown=1" <<< "$cni_args"; then
-		return 0
-	else
 		return 1
+	else
+		return 0
 	fi
 }
 
