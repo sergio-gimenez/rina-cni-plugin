@@ -124,11 +124,11 @@ else
 	k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
 	echo "k8s_namespace: $k8s_namespace" >> $log
 
-	    #TODO Test
-	    rina_manager="84.88.40.202:3003"
-	    slice_id="123456"
-	    curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>> $log
-	    echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
+    #TODO Test
+	rina_manager="84.88.40.202:3003"
+	slice_id="123456"
+	curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>> $log
+	echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
 fi
 
 echo $output >> $log
