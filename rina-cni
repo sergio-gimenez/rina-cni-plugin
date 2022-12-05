@@ -21,14 +21,7 @@ get_pod_name_from(){
 
 should_ignore_pod(){
     cni_args="$1"
-    # If word "IgnoreUnknown" is not present in cni_args, then function returns false.
-    if [ "$(echo "$cni_args" | grep -c "IgnoreUnknown")" -eq 0 ]; then
-        return 1
-    fi
-    
-    ignore_unknown_key_value=$(echo "$cni_args" | tr ";" "\n" | grep -w "IgnoreUnknown")
-    ignore_unknown="$(cut -d'=' -f2 <<<"$ignore_unknown_key_value")"
-    if [ "$ignore_unknown" == "1" ]; then
+    if grep -q "IgnoreUnknown=1" <<< "$cni_args"; then
         return 0
     else
         return 1
