@@ -19,6 +19,13 @@ get_pod_name_from(){
     echo "$pod_name"
 }
 
+get_pod_namespace_from(){
+    cni_args="$1"
+    pod_namespace_key_value=$(echo "$cni_args" | tr ";" "\n" | grep -w "K8S_POD_NAMESPACE")
+    pod_namespace="$(cut -d'=' -f2 <<<"$pod_namespace_key_value")"
+    echo "$pod_namespace"
+}
+
 should_ignore_pod(){
     cni_args="$1"
     if grep -q "IgnoreUnknown=1" <<< "$cni_args"; then
@@ -105,12 +112,21 @@ case $CNI_COMMAND in
             echo "pod_name=$(get_pod_name_from "$CNI_ARGS")" >> $log
             echo "kubectl_output=$kubectl_output" >> $log
             echo "slice_id: $slice_id" >> $log
+
             rina_manager=$(echo $config | jq -r ".rina_manager")
             echo "rina_manager: $rina_manager" >> $log
+
+            k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID)
+            echo "k8s_node: $k8s_node" >> $log
+
+            k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
+            echo "k8s_namespace: $k8s_namespace" >> $log
+
             #TODO Test
             rina_manager="84.88.40.202:3003"
             slice_id="123456"
-            curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&namespace=default" -H 'accept: application/json' -d ''
+            curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d ''
+            echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
         fi
         
         echo $output >> $log
