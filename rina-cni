@@ -19,6 +19,17 @@ get_pod_name_from(){
     echo "$pod_name"
 }
 
+should_ignore_pod(){
+    cni_args="$1"
+    pod_name_key_value=$(echo "$cni_args" | tr ";" "\n" | grep -w "IgnoreUnknown")
+    pod_name="$(cut -d'=' -f2 <<<"$pod_name_key_value")"
+    if [ "$pod_name" == "1" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 case $CNI_COMMAND in
     ADD)
         echo "CNI_ARGS: $CNI_ARGS" >> $log
@@ -85,19 +96,29 @@ case $CNI_COMMAND in
         echo "address $address" >> $log
         echo "podcidr_gw $podcidr_gw" >> $log
         output=$(printf "${output_template}" "$CNI_IFNAME" "$mac" "$CNI_NETNS" "$address" "$podcidr_gw")
+        
+        if should_ignore_pod "$CNI_ARGS"; then
+            echo "Ignoring pod $pod_name"  >> $log
+        else
+            pod_name=$(get_pod_name_from "$CNI_ARGS")
+            kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id)
+            slice_id=$(get_slice_id_from "$kubectl_output")
+            
+            echo "pod_name=$(get_pod_name_from "$CNI_ARGS")" >> $log
+            echo "kubectl_output=$kubectl_output" >> $log
+            echo "slice_id: $slice_id" >> $log
+            rina_manager=$(echo $config | jq -r ".rina_manager")
+            echo "rina_manager: $rina_manager" >> $log
+            #TODO Test
+            rina_manager="84.88.40.202:3003"
+            slice_id="123456"
+            curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&namespace=default" -H 'accept: application/json' -d ''
+        fi
+        
         echo $output >> $log
         echo "$output"
         
-        
-        pod_name=$(get_pod_name_from "$CNI_ARGS")
-        kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id)
-        slice_id=$(get_slice_id_from "$kubectl_output")
-
-        echo "pod_name=$(get_pod_name_from "$CNI_ARGS")" >> $log
-        echo "kubectl_output=$kubectl_output" >> $log
-        echo "slice_id: $slice_id" >> $log
     ;;
-    
     DEL)
         rm -rf /var/run/netns/$CNI_CONTAINERID
         vale-ctl -d vale0:$host_ifname
