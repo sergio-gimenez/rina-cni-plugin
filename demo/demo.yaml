@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: alpine1
   labels:
-    slice_id: "123456"
+    slice_id: "111"
 spec:
   containers:
     - name: alpine
@@ -20,7 +20,7 @@ kind: Pod
 metadata:
   name: nginx1
   labels:
-    slice_id: "123456"
+    slice_id: "111"
 spec:
   containers:
     - name: nginx
@@ -33,7 +33,7 @@ kind: Pod
 metadata:
   name: nginx2
   labels:
-    slice_id: "123456"
+    slice_id: "111"
 spec:
   containers:
     - name: nginx
