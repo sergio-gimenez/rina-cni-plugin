@@ -37,19 +37,55 @@ should_ignore_pod(){
     fi
 }
 
+send_response_to_k8s(){
+    ip=$1
+    podcidr_gw=$2
+    mac=$(ip netns exec "$CNI_CONTAINERID" ip link show eth0 | awk '/ether/ {print $2}')
+    address="${ip}/24"
+    output_template='
+    {
+        "cniVersion": "0.3.1",
+        "interfaces": [
+            {
+                "name": "%s",
+                "mac": "%s",
+                "sandbox": "%s"
+            }
+        ],
+        "ips": [
+            {
+                "version": "4",
+                "address": "%s",
+                "gateway": "%s",
+                "interface": 0
+            }
+        ]
+    }'
+    
+    echo "mac $mac" >> $log
+    echo "CNI_NETNS (sandbox) $CNI_NETNS" >> $log
+    echo "address $address" >> $log
+    echo "podcidr_gw $podcidr_gw" >> $log
+    output=$(printf "${output_template}" "$CNI_IFNAME" "$mac" "$CNI_NETNS" "$address" "$podcidr_gw")
+    echo $output >> $log
+    echo "$output"
+}
+
+log_pod_info(){
+    echo "CNI_ARGS: $CNI_ARGS" >> $log
+    echo "CNI_NETNS: $CNI_NETNS" >> $log
+    echo "CNI_IFNAME: $CNI_IFNAME" >> $log
+    echo "CNI_PATH: $CNI_PATH" >> $log
+    echo "CNI_CONTAINERID: $CNI_CONTAINERID" >> $log
+    echo "CNI_IFNAME $CNI_IFNAME" >> $log
+}
+
 case $CNI_COMMAND in
     ADD)
-        echo "CNI_ARGS: $CNI_ARGS" >> $log
-        echo "CNI_NETNS: $CNI_NETNS" >> $log
-        echo "CNI_IFNAME: $CNI_IFNAME" >> $log
-        echo "CNI_PATH: $CNI_PATH" >> $log
-        echo "CNI_CONTAINERID: $CNI_CONTAINERID" >> $log
-        
-        
         # TODO check if the application has a slice_id field, if not, move to DELETE.
         
         podcidr=$(echo $config | jq -r ".podcidr") # Calculate CIDR of the netowrk in node. First will be 10.240.0.0./24
-        podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # Calculate CIDR of the netowrk in node 10.240.0.1
+        podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # Calculate gateway of the netowrk in node 10.240.0.1
         
         # This method is very simple. Just reads the file that holds the last IP and increment this read IP by one and update the file.
         if [ -f /tmp/last_allocated_ip ]; then
@@ -62,8 +98,8 @@ case $CNI_COMMAND in
         echo $n > /tmp/last_allocated_ip
         
         host_ifname="veth$n"
-        ip link add $CNI_IFNAME type veth peer name $host_ifname
-        ip link set $host_ifname up
+        ip link add $CNI_IFNAME type veth peer name $host_ifname # Create veth pair
+        ip link set $host_ifname up # Set veth$n up
         
         mkdir -p /var/run/netns/
         vale-ctl -a vale0:$host_ifname # Connect veth$n to the vale switch
@@ -73,35 +109,7 @@ case $CNI_COMMAND in
         
         ip netns exec $CNI_CONTAINERID ip link set $CNI_IFNAME up
         ip netns exec $CNI_CONTAINERID ip addr add $ip/24 dev $CNI_IFNAME
-        ip netns exec $CNI_CONTAINERID ip route add default via $podcidr_gw # TODO I think this is not needed
-        
-        mac=$(ip netns exec "$CNI_CONTAINERID" ip link show eth0 | awk '/ether/ {print $2}')
-        address="${ip}/24"
-        output_template='
-        {
-            "cniVersion": "0.3.1",
-            "interfaces": [
-                {
-                    "name": "%s",
-                    "mac": "%s",
-                    "sandbox": "%s"
-                }
-            ],
-            "ips": [
-                {
-                    "version": "4",
-                    "address": "%s",
-                    "gateway": "%s",
-                    "interface": 0
-                }
-            ]
-        }'
-        echo "CNI_IFNAME $CNI_IFNAME" >> $log
-        echo "mac $mac" >> $log
-        echo "CNI_NETNS (sandbox) $CNI_NETNS" >> $log
-        echo "address $address" >> $log
-        echo "podcidr_gw $podcidr_gw" >> $log
-        output=$(printf "${output_template}" "$CNI_IFNAME" "$mac" "$CNI_NETNS" "$address" "$podcidr_gw")
+        # ip netns exec $CNI_CONTAINERID ip route add default via $podcidr_gw # TODO I think this is not needed
         
         pod_name=$(get_pod_name_from "$CNI_ARGS")
         echo "pod_name=$(get_pod_name_from "$CNI_ARGS")" >> $log
@@ -124,16 +132,15 @@ case $CNI_COMMAND in
             k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
             echo "k8s_namespace: $k8s_namespace" >> $log
             
-            #TODO Test
+            #TODO This is a test, delete that later
             rina_manager="10.10.0.13:8000"
             slice_id="111"
             curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>> $log
             echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
         fi
-        
-        echo $output >> $log
-        echo "$output"
-        
+
+        send_response_to_k8s "$ip" "$podcidr_gw"
+        log_pod_info        
     ;;
     DEL)
         rm -rf /var/run/netns/$CNI_CONTAINERID
