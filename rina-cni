@@ -67,10 +67,10 @@ case $CNI_COMMAND in
         ip link set $host_ifname up
         
         mkdir -p /var/run/netns/
-        vale-ctl -a vale0:$host_ifname # Connect veth1 to the vale switch
+        vale-ctl -a vale0:$host_ifname # Connect veth$n to the vale switch
         echo "Added iface: vale-ctl -a vale0:$host_ifname" >> $log
         ln -sfT $CNI_NETNS /var/run/netns/$CNI_CONTAINERID
-        ip link set $CNI_IFNAME netns $CNI_CONTAINERID # Move rina0 to pod netns
+        ip link set $CNI_IFNAME netns $CNI_CONTAINERID # Move veth to pod netns
         
         ip netns exec $CNI_CONTAINERID ip link set $CNI_IFNAME up
         ip netns exec $CNI_CONTAINERID ip addr add $ip/24 dev $CNI_IFNAME
@@ -128,7 +128,7 @@ case $CNI_COMMAND in
             
             #TODO Test
             rina_manager="84.88.40.202:3003"
-            slice_id="123456"
+            slice_id="111"
             curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>> $log
             echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
         fi
@@ -139,8 +139,8 @@ case $CNI_COMMAND in
     ;;
     DEL)
         rm -rf /var/run/netns/$CNI_CONTAINERID
-        vale-ctl -d vale0:$host_ifname
-        echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
+        # vale-ctl -d vale0:$host_ifname
+        # echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
     ;;
     
     GET)
