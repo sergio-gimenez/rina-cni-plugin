@@ -153,7 +153,7 @@ case $CNI_COMMAND in
             echo "Ignoring pod $pod_name"  >> $log
         else
             kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id) >> $log
-            slice_id=$(get_slice_id_from "$kubectl_output") 2>> $log
+            slice_id=$(get_slice_id_from "$kubectl_output") >> $log
             
             echo "kubectl_output=$kubectl_output" >> $log
             echo "slice_id: $slice_id" >> $log
@@ -161,7 +161,7 @@ case $CNI_COMMAND in
             rina_manager=$(echo $config | jq -r ".rina_manager")
             echo "rina_manager: $rina_manager" >> $log
             
-            k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID) 2>> $log
+            k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID) >> $log
             echo "k8s_node: $k8s_node" >> $log
             
             k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
@@ -170,7 +170,7 @@ case $CNI_COMMAND in
             #TODO This is a test, delete that later
             rina_manager="10.10.0.13:8000"
             slice_id="111"
-            curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>> $log
+            curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' >> $log
             echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
         fi
         
