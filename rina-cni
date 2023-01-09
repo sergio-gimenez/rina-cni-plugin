@@ -118,10 +118,15 @@ case $CNI_COMMAND in
     ADD)
         # TODO check if the application has a slice_id field, if not, move to DELETE.
         podcidr=$(get_pod_cidr)
+        echo "podcidr $podcidr" >> $log
         podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # Calculate gateway of the netowrk in node 10.240.0.1
+        echo "podcidr_gw $podcidr_gw" >> $log
         host_ifname=$(get_host_ifname)
+        echo "host_ifname $host_ifname" >> $log
         ip=$(get_pod_ip $podcidr)
+        echo "ip $ip" >> $log
         setup_veth_pair $host_ifname $ip
+        echo "Setting up veth pair: for $host_ifname with $ip" >> $log
         
         vale-ctl -a vale0:$host_ifname # Connect veth$n to the vale switch
         echo "Added iface: vale-ctl -a vale0:$host_ifname" >> $log
@@ -129,30 +134,30 @@ case $CNI_COMMAND in
         pod_name=$(get_pod_name_from "$CNI_ARGS")
         echo "pod_name=$(get_pod_name_from "$CNI_ARGS")" >> $log
         
-        if should_ignore_pod "$CNI_ARGS"; then
-            echo "Ignoring pod $pod_name"  >> $log
-        else
-            kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id) 2>> $log
-            slice_id=$(get_slice_id_from "$kubectl_output") 2>> $log
+        # if should_ignore_pod "$CNI_ARGS"; then
+        #     echo "Ignoring pod $pod_name"  >> $log
+        # else
+        #     kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id) 2>> $log
+        #     slice_id=$(get_slice_id_from "$kubectl_output") 2>> $log
             
-            echo "kubectl_output=$kubectl_output" >> $log
-            echo "slice_id: $slice_id" >> $log
+        #     echo "kubectl_output=$kubectl_output" >> $log
+        #     echo "slice_id: $slice_id" >> $log
             
-            rina_manager=$(echo $config | jq -r ".rina_manager")
-            echo "rina_manager: $rina_manager" >> $log
+        #     rina_manager=$(echo $config | jq -r ".rina_manager")
+        #     echo "rina_manager: $rina_manager" >> $log
             
-            k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID) 2>> $log
-            echo "k8s_node: $k8s_node" >> $log
+        #     k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID) 2>> $log
+        #     echo "k8s_node: $k8s_node" >> $log
             
-            k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
-            echo "k8s_namespace: $k8s_namespace" >> $log
+        #     k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
+        #     echo "k8s_namespace: $k8s_namespace" >> $log
             
-            #TODO This is a test, delete that later
-            rina_manager="10.10.0.13:8000"
-            slice_id="111"
-            curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>> $log
-            echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
-        fi
+        #     #TODO This is a test, delete that later
+        #     rina_manager="10.10.0.13:8000"
+        #     slice_id="111"
+        #     curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>> $log
+        #     echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
+        # fi
         
         send_response_to_k8s "$ip" "$podcidr_gw"
         log_pod_info
