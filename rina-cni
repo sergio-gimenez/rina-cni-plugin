@@ -48,10 +48,9 @@ case $CNI_COMMAND in
         
         # TODO check if the application has a slice_id field, if not, move to DELETE.
         
-        podcidr=$(echo $config | jq -r ".podcidr") # 10.240.0.0./24
-        podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # 10.240.0.1
+        podcidr=$(echo $config | jq -r ".podcidr") # Calculate CIDR of the netowrk in node. First will be 10.240.0.0./24
+        podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # Calculate CIDR of the netowrk in node 10.240.0.1
         
-        # calculate $ip
         # This method is very simple. Just reads the file that holds the last IP and increment this read IP by one and update the file.
         if [ -f /tmp/last_allocated_ip ]; then
             n=`cat /tmp/last_allocated_ip`
@@ -111,8 +110,7 @@ case $CNI_COMMAND in
             echo "Ignoring pod $pod_name"  >> $log
         else
             kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id) 2>> $log
-            slice_id=$(get_slice_id_from "$kubectl_output")
-            
+            slice_id=$(get_slice_id_from "$kubectl_output") 2>> $log
             
             echo "kubectl_output=$kubectl_output" >> $log
             echo "slice_id: $slice_id" >> $log
@@ -138,12 +136,12 @@ case $CNI_COMMAND in
         
     ;;
     DEL)
-        rm -rf /var/run/netns/$CNI_CONTAINERID          
-        if ! should_ignore_pod "$CNI_ARGS"; then
-            vale-ctl -d vale0:$host_ifname
-            echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
-        fi
-
+        rm -rf /var/run/netns/$CNI_CONTAINERID
+        # if ! should_ignore_pod "$CNI_ARGS"; then
+        #     vale-ctl -d vale0:$host_ifname
+        #     echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
+        # fi
+        
     ;;
     
     GET)
