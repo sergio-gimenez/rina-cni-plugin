@@ -127,7 +127,7 @@ case $CNI_COMMAND in
             echo "k8s_namespace: $k8s_namespace" >> $log
             
             #TODO Test
-            rina_manager="84.88.40.202:3003"
+            rina_manager="10.10.0.13:8000"
             slice_id="111"
             curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>> $log
             echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
@@ -139,8 +139,9 @@ case $CNI_COMMAND in
     ;;
     DEL)
         rm -rf /var/run/netns/$CNI_CONTAINERID
-        # vale-ctl -d vale0:$host_ifname
-        # echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
+        if ! should_ignore_pod "$CNI_ARGS"; then
+            vale-ctl -d vale0:$host_ifname
+            echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
     ;;
     
     GET)
