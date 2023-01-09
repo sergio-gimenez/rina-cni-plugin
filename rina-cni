@@ -1,9 +1,11 @@
 #!/bin/bash
 log=/var/log/cni.log
 config=`cat /dev/stdin`
+declare -A host_ifnames_pod_name_map
 
 echo >> $log
 echo "COMMAND: $CNI_COMMAND" >> $log
+
 
 get_slice_id_from(){
     IN="$1"
@@ -120,6 +122,17 @@ setup_veth_pair(){
     # ip netns exec $CNI_CONTAINERID ip route add default via $podcidr_gw # TODO I think this is not needed
 }
 
+save_host_ifname_by_pod_name(){
+    host_ifname=$1
+    pod_name=$2
+    host_ifnames_pod_name_map[$pod_name]=$host_ifname
+}
+
+get_host_ifname_by_pod_name(){
+    pod_name=$1
+    echo ${host_ifnames_pod_name_map[$pod_name]}
+}
+
 case $CNI_COMMAND in
     ADD)
         # TODO check if the application has a slice_id field, if not, move to DELETE.
@@ -134,10 +147,12 @@ case $CNI_COMMAND in
         vale-ctl -a vale0:$host_ifname # Connect veth$n to the vale switch
         echo "Added iface: vale-ctl -a vale0:$host_ifname" >> $log
         
+        save_host_ifname_pod_name $host_ifname $pod_name # Keep track of the veth pair name for each pod for later cleanup
+        
         if should_ignore_pod "$CNI_ARGS"; then
             echo "Ignoring pod $pod_name"  >> $log
         else
-            kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id) 2>> $log
+            kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id) >> $log
             slice_id=$(get_slice_id_from "$kubectl_output") 2>> $log
             
             echo "kubectl_output=$kubectl_output" >> $log
@@ -166,10 +181,10 @@ case $CNI_COMMAND in
     
     DEL)
         rm -rf /var/run/netns/$CNI_CONTAINERID
-        # if ! should_ignore_pod "$CNI_ARGS"; then
-        #     vale-ctl -d vale0:$host_ifname
-        #     echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
-        # fi
+        pod_name=$(get_pod_name_from "$CNI_ARGS")
+        host_ifname=$(get_host_ifname_by_pod_name $pod_name)
+        vale-ctl -d vale0:$host_ifname
+        echo "Deleted iface: vale-ctl -d vale0:$host_ifname for pod=$podname" >> $log
         
     ;;
     
