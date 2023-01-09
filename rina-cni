@@ -97,6 +97,11 @@ get_host_ifname(){
 }
 
 get_pod_ip(){
+    if [ -f /tmp/last_allocated_ip ]; then
+        n=`cat /tmp/last_allocated_ip`
+    else
+        n=1
+    fi
     podcidr=$1
     ip=$(echo $podcidr | sed "s:0/24:$n:g")
     echo $ip
@@ -162,7 +167,9 @@ case $CNI_COMMAND in
         
         send_response_to_k8s "$ip" "$podcidr_gw"
         log_pod_info
+
     ;;
+
     DEL)
         rm -rf /var/run/netns/$CNI_CONTAINERID
         # if ! should_ignore_pod "$CNI_ARGS"; then
@@ -173,6 +180,7 @@ case $CNI_COMMAND in
     ;;
     
     GET)
+
     ;;
     
     VERSION)
