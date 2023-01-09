@@ -138,10 +138,12 @@ case $CNI_COMMAND in
         
     ;;
     DEL)
-        rm -rf /var/run/netns/$CNI_CONTAINERID
+        rm -rf /var/run/netns/$CNI_CONTAINERID          
         if ! should_ignore_pod "$CNI_ARGS"; then
             vale-ctl -d vale0:$host_ifname
             echo "Deleted iface: vale-ctl -d vale0:$host_ifname" >> $log
+        fi
+
     ;;
     
     GET)
