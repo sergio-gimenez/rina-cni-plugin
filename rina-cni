@@ -80,7 +80,7 @@ log_pod_info(){
     echo "CNI_IFNAME $CNI_IFNAME" >> $log
 }
 
-get_pod_cidr(){
+get_pod_cidr(){    
     echo $config | jq -r ".podcidr" # Read PodCIDR from config file
 }
 
@@ -99,6 +99,7 @@ get_host_ifname(){
 get_pod_ip(){
     podcidr=$1
     ip=$(echo $podcidr | sed "s:0/24:$n:g")
+    echo $ip
 }
 
 setup_veth_pair(){
