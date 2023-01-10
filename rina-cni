@@ -148,6 +148,7 @@ case $CNI_COMMAND in
         echo "Added iface: vale-ctl -a vale0:$host_ifname" >> $log
         
         save_host_ifname_by_containerid $host_ifname $CNI_CONTAINERID  # Keep track of the veth pair name for each pod (identified by container netns) for later cleanup
+        echo "Saved host_ifname=$host_ifname for containerid=$CNI_CONTAINERID" >> $log
         
         if should_ignore_pod "$CNI_ARGS"; then
             echo "Ignoring pod $pod_name"  >> $log
@@ -183,7 +184,7 @@ case $CNI_COMMAND in
         echo CN
         host_ifname=$(get_host_ifname_by_containerid $CNI_CONTAINERID)
         vale-ctl -d vale0:$host_ifname
-        echo "Deleted iface: vale-ctl -d vale0:$host_ifname for pod=$podname" >> $log
+        echo "Deleted iface: vale-ctl -d vale0:$host_ifname for containerid=$CNI_CONTAINERID" >> $log
         rm -rf /var/run/netns/$CNI_CONTAINERID
     ;;
     
