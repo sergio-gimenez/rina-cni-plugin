@@ -1,7 +1,7 @@
 #!/bin/bash
 log=/var/log/cni.log
 config=$(cat /dev/stdin)
-declare -A host_ifnames_containerid_map
+declare -A host_ifnames_containerid_map # Declare an associative array (hashmap)
 
 echo >>$log
 echo "COMMAND: $CNI_COMMAND" >>$log
@@ -152,25 +152,26 @@ ADD)
     if should_ignore_pod "$CNI_ARGS"; then
         echo "Ignoring pod $pod_name" >>$log
     else
-        kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id)
-        slice_id=$(get_slice_id_from "$kubectl_output")
+        # kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id)
+        # slice_id=$(get_slice_id_from "$kubectl_output")
 
-        echo "kubectl_output=$kubectl_output" >>$log
-        echo "slice_id: $slice_id" >>$log
+        # echo "kubectl_output=$kubectl_output" >>$log
+        # echo "slice_id: $slice_id" >>$log
 
-        rina_manager=$(echo $config | jq -r ".rina_manager")
-        echo "rina_manager: $rina_manager" >>$log
-
-        k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID)
-        echo "k8s_node: $k8s_node" >>$log
+        # k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID)
+        # echo "k8s_node: $k8s_node" >>$log
 
         k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
         echo "k8s_namespace: $k8s_namespace" >>$log
 
+        rina_manager=$(echo $config | jq -r ".rina_manager")
+        echo "rina_manager: $rina_manager" >>$log
+
         #TODO This is a test, delete that later
+        k8s_node=$(hostname)
         rina_manager="10.10.0.13:8000"
         slice_id="111"
-        curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' >>$log
+        curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' 2>>log
         echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >>$log
     fi
 
@@ -180,7 +181,6 @@ ADD)
     ;;
 
 DEL)
-    echo CN
     host_ifname=$(get_host_ifname_by_containerid "$CNI_CONTAINERID")
     vale-ctl -d vale0:"$host_ifname"
     echo "Deleted iface: vale-ctl -d vale0:$host_ifname for containerid=$CNI_CONTAINERID" >>$log
