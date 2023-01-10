@@ -1,34 +1,33 @@
 #!/bin/bash
 log=/var/log/cni.log
-config=`cat /dev/stdin`
+config=$(cat /dev/stdin)
 declare -A host_ifnames_containerid_map
 
-echo >> $log
-echo "COMMAND: $CNI_COMMAND" >> $log
+echo >>$log
+echo "COMMAND: $CNI_COMMAND" >>$log
 
-
-get_slice_id_from(){
+get_slice_id_from() {
     IN="$1"
-    
+
     slice_id=$(echo $IN | tr "=" "\n" | sed -n 2p)
     echo "$slice_id"
 }
 
-get_pod_name_from(){
+get_pod_name_from() {
     cni_args="$1"
     pod_name_key_value=$(echo "$cni_args" | tr ";" "\n" | grep -w "K8S_POD_NAME")
     pod_name="$(cut -d'=' -f2 <<<"$pod_name_key_value")"
     echo "$pod_name"
 }
 
-get_pod_namespace_from(){
+get_pod_namespace_from() {
     cni_args="$1"
     pod_namespace_key_value=$(echo "$cni_args" | tr ";" "\n" | grep -w "K8S_POD_NAMESPACE")
     pod_namespace="$(cut -d'=' -f2 <<<"$pod_namespace_key_value")"
     echo "$pod_namespace"
 }
 
-should_ignore_pod(){
+should_ignore_pod() {
     cni_args="$1"
     if get_pod_namespace_from "$cni_args" | grep -q "kube-system"; then
         echo "true"
@@ -39,7 +38,7 @@ should_ignore_pod(){
     fi
 }
 
-send_response_to_k8s(){
+send_response_to_k8s() {
     ip=$1
     podcidr_gw=$2
     mac=$(ip netns exec "$CNI_CONTAINERID" ip link show eth0 | awk '/ether/ {print $2}')
@@ -63,44 +62,44 @@ send_response_to_k8s(){
             }
         ]
     }'
-    
-    echo "mac $mac" >> $log
-    echo "CNI_NETNS (sandbox) $CNI_NETNS" >> $log
-    echo "address $address" >> $log
-    echo "podcidr_gw $podcidr_gw" >> $log
+
+    echo "mac $mac" >>$log
+    echo "CNI_NETNS (sandbox) $CNI_NETNS" >>$log
+    echo "address $address" >>$log
+    echo "podcidr_gw $podcidr_gw" >>$log
     output=$(printf "${output_template}" "$CNI_IFNAME" "$mac" "$CNI_NETNS" "$address" "$podcidr_gw")
-    echo $output >> $log
+    echo $output >>$log
     echo "$output"
 }
 
-log_pod_info(){
-    echo "CNI_ARGS: $CNI_ARGS" >> $log
-    echo "CNI_NETNS: $CNI_NETNS" >> $log
-    echo "CNI_IFNAME: $CNI_IFNAME" >> $log
-    echo "CNI_PATH: $CNI_PATH" >> $log
-    echo "CNI_CONTAINERID: $CNI_CONTAINERID" >> $log
-    echo "CNI_IFNAME $CNI_IFNAME" >> $log
+log_pod_info() {
+    echo "CNI_ARGS: $CNI_ARGS" >>$log
+    echo "CNI_NETNS: $CNI_NETNS" >>$log
+    echo "CNI_IFNAME: $CNI_IFNAME" >>$log
+    echo "CNI_PATH: $CNI_PATH" >>$log
+    echo "CNI_CONTAINERID: $CNI_CONTAINERID" >>$log
+    echo "CNI_IFNAME $CNI_IFNAME" >>$log
 }
 
-get_pod_cidr(){
+get_pod_cidr() {
     echo $config | jq -r ".podcidr" # Read PodCIDR from config file
 }
 
-get_host_ifname(){
+get_host_ifname() {
     # This method is very simple. Just reads the file that holds the last IP and increment this read IP by one and update the file.
     if [ -f /tmp/last_allocated_ip ]; then
-        n=`cat /tmp/last_allocated_ip`
+        n=$(cat /tmp/last_allocated_ip)
     else
         n=1
     fi
-    n=$(($n+1))
-    echo $n > /tmp/last_allocated_ip
+    n=$(($n + 1))
+    echo $n >/tmp/last_allocated_ip
     echo "veth$n"
 }
 
-get_pod_ip(){
+get_pod_ip() {
     if [ -f /tmp/last_allocated_ip ]; then
-        n=`cat /tmp/last_allocated_ip`
+        n=$(cat /tmp/last_allocated_ip)
     else
         n=1
     fi
@@ -109,11 +108,11 @@ get_pod_ip(){
     echo $ip
 }
 
-setup_veth_pair(){
+setup_veth_pair() {
     host_ifname=$1
     ip=$2
     ip link add $CNI_IFNAME type veth peer name $host_ifname # Create veth pair
-    ip link set $host_ifname up # Set veth$n up
+    ip link set $host_ifname up                              # Set veth$n up
     mkdir -p /var/run/netns/
     ln -sfT $CNI_NETNS /var/run/netns/$CNI_CONTAINERID
     ip link set $CNI_IFNAME netns $CNI_CONTAINERID # Move veth to pod netns
@@ -122,86 +121,86 @@ setup_veth_pair(){
     # ip netns exec $CNI_CONTAINERID ip route add default via $podcidr_gw # TODO I think this is not needed
 }
 
-save_host_ifname_by_containerid(){
+save_host_ifname_by_containerid() {
     host_ifname=$1
     containerid=$2
     host_ifnames_containerid_map[$containerid]=$host_ifname
 }
 
-get_host_ifname_by_containerid(){
+get_host_ifname_by_containerid() {
     containerid=$1
-    echo ${host_ifnames_containerid_map[$containerid]}
+    echo "${host_ifnames_containerid_map[$containerid]}"
 }
 
 case $CNI_COMMAND in
-    ADD)
-        # TODO check if the application has a slice_id field, if not, move to DELETE.
-        podcidr=$(get_pod_cidr)
-        podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # Calculate gateway of the netowrk in node 10.240.0.1
-        host_ifname=$(get_host_ifname)
-        ip=$(get_pod_ip $podcidr)
-        pod_name=$(get_pod_name_from "$CNI_ARGS")
-        setup_veth_pair $host_ifname $ip
-        echo "Setting up veth pair $host_ifname for pod=$pod_name with ip=$ip" >> $log
-        
-        vale-ctl -a vale0:$host_ifname # Connect veth$n to the vale switch
-        echo "Added iface: vale-ctl -a vale0:$host_ifname" >> $log
-        
-        save_host_ifname_by_containerid $host_ifname $CNI_CONTAINERID  # Keep track of the veth pair name for each pod (identified by container netns) for later cleanup
-        echo "Saved host_ifname=$host_ifname for containerid=$CNI_CONTAINERID" >> $log
-        
-        if should_ignore_pod "$CNI_ARGS"; then
-            echo "Ignoring pod $pod_name"  >> $log
-        else
-            kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id) >> $log
-            slice_id=$(get_slice_id_from "$kubectl_output") >> $log
-            
-            echo "kubectl_output=$kubectl_output" >> $log
-            echo "slice_id: $slice_id" >> $log
-            
-            rina_manager=$(echo $config | jq -r ".rina_manager")
-            echo "rina_manager: $rina_manager" >> $log
-            
-            k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID) >> $log
-            echo "k8s_node: $k8s_node" >> $log
-            
-            k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
-            echo "k8s_namespace: $k8s_namespace" >> $log
-            
-            #TODO This is a test, delete that later
-            rina_manager="10.10.0.13:8000"
-            slice_id="111"
-            curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' >> $log
-            echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >> $log
-        fi
-        
-        send_response_to_k8s "$ip" "$podcidr_gw"
-        log_pod_info
-        
+ADD)
+    # TODO check if the application has a slice_id field, if not, move to DELETE.
+    podcidr=$(get_pod_cidr)
+    podcidr_gw=$(echo $podcidr | sed "s:0/24:1:g") # Calculate gateway of the netowrk in node 10.240.0.1
+    host_ifname=$(get_host_ifname)
+    ip=$(get_pod_ip $podcidr)
+    pod_name=$(get_pod_name_from "$CNI_ARGS")
+    setup_veth_pair "$host_ifname" "$ip"
+    echo "Setting up veth pair $host_ifname for pod=$pod_name with ip=$ip" >>$log
+
+    vale-ctl -a vale0:$host_ifname # Connect veth$n to the vale switch
+    echo "Added iface: vale-ctl -a vale0:$host_ifname" >>$log
+
+    save_host_ifname_by_containerid "$host_ifname" "$CNI_CONTAINERID" # Keep track of the veth pair name for each pod (identified by container netns) for later cleanup
+    echo "Saved host_ifname=$host_ifname for containerid=$CNI_CONTAINERID" >>$log
+
+    if should_ignore_pod "$CNI_ARGS"; then
+        echo "Ignoring pod $pod_name" >>$log
+    else
+        kubectl_output=$(kubectl describe pod "$pod_name" | grep slice_id)
+        slice_id=$(get_slice_id_from "$kubectl_output")
+
+        echo "kubectl_output=$kubectl_output" >>$log
+        echo "slice_id: $slice_id" >>$log
+
+        rina_manager=$(echo $config | jq -r ".rina_manager")
+        echo "rina_manager: $rina_manager" >>$log
+
+        k8s_node=$(kubectl get nodes -o json | jq -r .items[].status.nodeInfo.machineID)
+        echo "k8s_node: $k8s_node" >>$log
+
+        k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
+        echo "k8s_namespace: $k8s_namespace" >>$log
+
+        #TODO This is a test, delete that later
+        rina_manager="10.10.0.13:8000"
+        slice_id="111"
+        curl -X 'POST' "http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace" -H 'accept: application/json' -d '' >>$log
+        echo "curl -X 'POST' \"http://$rina_manager/notify?slice_id=$slice_id&node=$k8s_node&namespace=$k8s_namespace\" -H 'accept: application/json' -d ''" >>$log
+    fi
+
+    send_response_to_k8s "$ip" "$podcidr_gw"
+    log_pod_info
+
     ;;
-    
-    DEL)
-        echo CN
-        host_ifname=$(get_host_ifname_by_containerid $CNI_CONTAINERID)
-        vale-ctl -d vale0:$host_ifname
-        echo "Deleted iface: vale-ctl -d vale0:$host_ifname for containerid=$CNI_CONTAINERID" >> $log
-        rm -rf /var/run/netns/$CNI_CONTAINERID
+
+DEL)
+    echo CN
+    host_ifname=$(get_host_ifname_by_containerid "$CNI_CONTAINERID")
+    vale-ctl -d vale0:"$host_ifname"
+    echo "Deleted iface: vale-ctl -d vale0:$host_ifname for containerid=$CNI_CONTAINERID" >>$log
+    rm -rf /var/run/netns/$CNI_CONTAINERID
     ;;
-    
-    GET)
-        
-    ;;
-    
+
+GET) ;;
+
+\
+    \
     VERSION)
-        echo '{
+    echo '{
 	"cniVersion": "0.3.1",
 	"supportedVersions": [ "0.3.0", "0.3.1", "0.4.0" ]
         }'
     ;;
-    
-    *)
-        echo "Unknown cni command: $CNI_COMMAND"
-        exit 1
+
+*)
+    echo "Unknown cni command: $CNI_COMMAND"
+    exit 1
     ;;
-    
+
 esac
