@@ -181,6 +181,9 @@ ADD)
     ;;
 
 DEL)
+    for i in "${!host_ifnames_containerid_map[@]}"; do
+        echo "key : $i, value : ${host_ifnames_containerid_map[$i]}" >>$log
+    done
     host_ifname=$(get_host_ifname_by_containerid "$CNI_CONTAINERID")
     vale-ctl -d vale0:"$host_ifname"
     echo "Deleted iface: vale-ctl -d vale0:$host_ifname for containerid=$CNI_CONTAINERID" >>$log
