@@ -118,7 +118,7 @@ setup_veth_pair() {
     ip link set $CNI_IFNAME netns $CNI_CONTAINERID # Move veth to pod netns
     ip netns exec $CNI_CONTAINERID ip link set $CNI_IFNAME up
     ip netns exec $CNI_CONTAINERID ip addr add $ip/24 dev $CNI_IFNAME
-    # ip netns exec $CNI_CONTAINERID ip route add default via $podcidr_gw # TODO I think this is not needed
+    ip netns exec $CNI_CONTAINERID ip route add default via $podcidr_gw # TODO I think this is not needed
 }
 
 save_host_ifname_by_containerid() {
