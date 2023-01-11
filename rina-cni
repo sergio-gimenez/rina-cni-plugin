@@ -147,6 +147,7 @@ function get_host_ifname_by_containerid {
     # Search for a key in the CSV file and print the corresponding value
     containerid=$1
     host_ifname=$(grep -E "^$containerid," $csv_file | cut -d ',' -f 2)
+    echo "Inside gest_host_ifname_by_containerid: $host_ifname"
     echo "$host_ifname"
 
     # Release the lock
