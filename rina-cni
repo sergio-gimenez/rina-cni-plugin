@@ -181,7 +181,7 @@ ADD)
     echo "Added iface: vale-ctl -a vale0:$host_ifname" >>$log
 
     # Keep track of the veth pair name for each pod (identified by container netns) for later cleanup
-    save_host_ifname_by_containerid "$host_ifname" "$CNI_CONTAINERID" 1>>$log 2>>/dev/null
+    save_host_ifname_by_containerid "$host_ifname" "$CNI_CONTAINERID" >>log #1>>$log 2>>/dev/null
     echo "Saved host_ifname=$host_ifname for containerid=$CNI_CONTAINERID" >>$log
 
     if should_ignore_pod "$CNI_ARGS"; then
