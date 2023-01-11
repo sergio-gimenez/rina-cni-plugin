@@ -1,33 +1,39 @@
 #!/bin/bash
 log=/var/log/cni.log
 config=$(cat /dev/stdin)
-declare -A host_ifnames_containerid_map # Declare an associative array (hashmap)
+
+# Define the path to the CSV file
+csv_file="/tmp/hash_map.csv"
+# Define the lock file
+lock_file="/tmp/hash_map.csv.lock"
+# Create lock file if not exist
+touch $lock_file
 
 echo >>$log
 echo "COMMAND: $CNI_COMMAND" >>$log
 
-get_slice_id_from() {
+function get_slice_id_from() {
     IN="$1"
 
     slice_id=$(echo $IN | tr "=" "\n" | sed -n 2p)
     echo "$slice_id"
 }
 
-get_pod_name_from() {
+function get_pod_name_from() {
     cni_args="$1"
     pod_name_key_value=$(echo "$cni_args" | tr ";" "\n" | grep -w "K8S_POD_NAME")
     pod_name="$(cut -d'=' -f2 <<<"$pod_name_key_value")"
     echo "$pod_name"
 }
 
-get_pod_namespace_from() {
+function get_pod_namespace_from() {
     cni_args="$1"
     pod_namespace_key_value=$(echo "$cni_args" | tr ";" "\n" | grep -w "K8S_POD_NAMESPACE")
     pod_namespace="$(cut -d'=' -f2 <<<"$pod_namespace_key_value")"
     echo "$pod_namespace"
 }
 
-should_ignore_pod() {
+function should_ignore_pod() {
     cni_args="$1"
     if get_pod_namespace_from "$cni_args" | grep -q "kube-system"; then
         echo "true"
@@ -38,7 +44,7 @@ should_ignore_pod() {
     fi
 }
 
-send_response_to_k8s() {
+function send_response_to_k8s() {
     ip=$1
     podcidr_gw=$2
     mac=$(ip netns exec "$CNI_CONTAINERID" ip link show eth0 | awk '/ether/ {print $2}')
@@ -72,7 +78,7 @@ send_response_to_k8s() {
     echo "$output"
 }
 
-log_pod_info() {
+function log_pod_info() {
     echo "CNI_ARGS: $CNI_ARGS" >>$log
     echo "CNI_NETNS: $CNI_NETNS" >>$log
     echo "CNI_IFNAME: $CNI_IFNAME" >>$log
@@ -81,11 +87,11 @@ log_pod_info() {
     echo "CNI_IFNAME $CNI_IFNAME" >>$log
 }
 
-get_pod_cidr() {
+function get_pod_cidr() {
     echo $config | jq -r ".podcidr" # Read PodCIDR from config file
 }
 
-get_host_ifname() {
+function get_host_ifname() {
     # This method is very simple. Just reads the file that holds the last IP and increment this read IP by one and update the file.
     if [ -f /tmp/last_allocated_ip ]; then
         n=$(cat /tmp/last_allocated_ip)
@@ -97,7 +103,7 @@ get_host_ifname() {
     echo "veth$n"
 }
 
-get_pod_ip() {
+function get_pod_ip() {
     if [ -f /tmp/last_allocated_ip ]; then
         n=$(cat /tmp/last_allocated_ip)
     else
@@ -108,7 +114,7 @@ get_pod_ip() {
     echo $ip
 }
 
-setup_veth_pair() {
+function setup_veth_pair() {
     host_ifname=$1
     ip=$2
     ip link add $CNI_IFNAME type veth peer name $host_ifname # Create veth pair
@@ -121,15 +127,42 @@ setup_veth_pair() {
     ip netns exec $CNI_CONTAINERID ip route add default via $podcidr_gw # TODO I think this is not needed
 }
 
-save_host_ifname_by_containerid() {
+function save_host_ifname_by_containerid {
+    # Acquire the lock
+    flock --exclusive "$lock_file"
+
+    # Append a key-value pair to the CSV file
     host_ifname=$1
     containerid=$2
-    host_ifnames_containerid_map[$containerid]=$host_ifname
+    echo "$host_ifname,$containerid" >>$csv_file
+
+    # Release the lock
+    flock --unlock "$lock_file"
 }
 
-get_host_ifname_by_containerid() {
+function get_host_ifname_by_containerid {
+    # Acquire the lock
+    flock --exclusive "$lock_file"
+
+    # Search for a key in the CSV file and print the corresponding value
     containerid=$1
-    echo "${host_ifnames_containerid_map[$containerid]}"
+    host_ifname=$(grep -E "^$containerid," $csv_file | cut -d ',' -f 2)
+    echo "$host_ifname"
+
+    # Release the lock
+    flock --unlock "$lock_file"
+}
+
+function delete_from_csv {
+    # Acquire the lock
+    flock --exclusive "$lock_file"
+
+    # Delete a key-value pair from the CSV file
+    containerid=$1
+    sed -i "/^$containerid,/d" $csv_file
+
+    # Release the lock
+    flock --unlock "$lock_file"
 }
 
 case $CNI_COMMAND in
@@ -146,7 +179,8 @@ ADD)
     vale-ctl -a vale0:$host_ifname # Connect veth$n to the vale switch
     echo "Added iface: vale-ctl -a vale0:$host_ifname" >>$log
 
-    save_host_ifname_by_containerid "$host_ifname" "$CNI_CONTAINERID" # Keep track of the veth pair name for each pod (identified by container netns) for later cleanup
+    # Keep track of the veth pair name for each pod (identified by container netns) for later cleanup
+    save_host_ifname_by_containerid "$host_ifname" "$CNI_CONTAINERID" 1>>$log 2>>/dev/null
     echo "Saved host_ifname=$host_ifname for containerid=$CNI_CONTAINERID" >>$log
 
     if should_ignore_pod "$CNI_ARGS"; then
@@ -164,8 +198,8 @@ ADD)
         k8s_namespace=$(get_pod_namespace_from "$CNI_ARGS")
         echo "k8s_namespace: $k8s_namespace" >>$log
 
-        rina_manager=$(echo $config | jq -r ".rina_manager")
-        echo "rina_manager: $rina_manager" >>$log
+        # rina_manager=$(echo $config | jq -r ".rina_manager")
+        # echo "rina_manager: $rina_manager" >>$log
 
         #TODO This is a test, delete that later
         k8s_node=$(hostname)
@@ -181,12 +215,10 @@ ADD)
     ;;
 
 DEL)
-    for i in "${!host_ifnames_containerid_map[@]}"; do
-        echo "key : $i, value : ${host_ifnames_containerid_map[$i]}" >>$log
-    done
     host_ifname=$(get_host_ifname_by_containerid "$CNI_CONTAINERID")
     vale-ctl -d vale0:"$host_ifname"
     echo "Deleted iface: vale-ctl -d vale0:$host_ifname for containerid=$CNI_CONTAINERID" >>$log
+    delete_from_csv "$CNI_CONTAINERID"
     rm -rf /var/run/netns/$CNI_CONTAINERID
     ;;
 
