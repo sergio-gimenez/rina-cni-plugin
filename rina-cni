@@ -129,7 +129,7 @@ function setup_veth_pair() {
 
 function save_host_ifname_by_containerid {
     # Acquire the lock
-    flock --exclusive "$lock_file"
+    # flock --exclusive "$lock_file"
 
     # Append a key-value pair to the CSV file
     host_ifname=$1
@@ -137,12 +137,12 @@ function save_host_ifname_by_containerid {
     echo "$host_ifname,$containerid" >>$csv_file
 
     # Release the lock
-    flock --unlock "$lock_file"
+    # flock --unlock "$lock_file"
 }
 
 function get_host_ifname_by_containerid {
     # Acquire the lock
-    flock --exclusive "$lock_file"
+    # flock --exclusive "$lock_file"
 
     # Search for a key in the CSV file and print the corresponding value
     containerid=$1
@@ -150,19 +150,19 @@ function get_host_ifname_by_containerid {
     echo "$host_ifname"
 
     # Release the lock
-    flock --unlock "$lock_file"
+    # flock --unlock "$lock_file"
 }
 
 function delete_from_csv {
     # Acquire the lock
-    flock --exclusive "$lock_file"
+    # flock --exclusive "$lock_file"
 
     # Delete a key-value pair from the CSV file
     containerid=$1
     sed -i "/^$containerid,/d" $csv_file
 
     # Release the lock
-    flock --unlock "$lock_file"
+    # flock --unlock "$lock_file"
 }
 
 case $CNI_COMMAND in
